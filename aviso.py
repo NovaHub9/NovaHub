@@ -125,8 +125,94 @@ async def menu(interaction: discord.Interaction):
     sent_message = await interaction.original_response()
     MENU_MESSAGES[guild_id] = (interaction.channel.id, sent_message.id)
 
-# --- Comandos para agregar, actualizar y eliminar scripts ---
-# (Los agregas igual que en tu código anterior...)
+@tree.command(name="addscripts", description="Agrega un script al menú (solo admins)")
+@is_admin()
+@app_commands.describe(name="Nombre del script", desc="Descripción", code="Código del script (debe iniciar con loadstring)")
+async def addscripts(interaction: discord.Interaction, name: str, desc: str, code: str):
+    if not code.strip().startswith("loadstring"):
+        await interaction.response.send_message(
+            "<a:emoji_105:1442298312408567930> Error script no agregado. El código debe iniciar con loadstring.",
+            ephemeral=True
+        )
+        return
+
+    guild_id = str(interaction.guild.id)
+    if guild_id not in data:
+        data[guild_id] = {"scripts": {}, "descriptions": {}}
+    scripts = data[guild_id]["scripts"]
+    descriptions = data[guild_id]["descriptions"]
+    if name in scripts:
+        await interaction.response.send_message("<a:emoji_105:1442298312408567930> Error script no agregado. Ya existe.", ephemeral=True)
+        return
+
+    scripts[name] = code
+    descriptions[name] = desc
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+    await interaction.response.send_message(f"<a:emoji_104:1442298298378617043> Script **{name}** agregado correctamente.", ephemeral=True)
+    await actualizar_menu(guild_id)
+
+@tree.command(name="actuscripts", description="Actualiza un script existente (solo admins)")
+@is_admin()
+@app_commands.describe(name="Nombre del script", code="Nuevo código", desc="Nueva descripción (opcional)")
+async def actuscripts(interaction: discord.Interaction, name: str, code: str, desc: str = None):
+    guild_id = str(interaction.guild.id)
+    if guild_id not in data or name not in data[guild_id]["scripts"]:
+        await interaction.response.send_message("<a:emoji_105:1442298312408567930> Ese script no existe.", ephemeral=True)
+        return
+    data[guild_id]["scripts"][name] = code
+    if desc:
+        data[guild_id]["descriptions"][name] = desc
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+    await interaction.response.send_message(f"<a:emoji_104:1442298298378617043> Script **{name}** actualizado correctamente.", ephemeral=True)
+    await actualizar_menu(guild_id)
+
+@tree.command(name="deletescripts", description="Elimina un script del menú (solo admins)")
+@is_admin()
+@app_commands.describe(name="Nombre del script")
+async def deletescripts(interaction: discord.Interaction, name: str):
+    guild_id = str(interaction.guild.id)
+    if guild_id not in data or name not in data[guild_id]["scripts"]:
+        await interaction.response.send_message("<a:emoji_105:1442298312408567930> Error script no eliminado. No existe.", ephemeral=True)
+        return
+    data[guild_id]["scripts"].pop(name)
+    data[guild_id]["descriptions"].pop(name)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+    await interaction.response.send_message(f"<a:emoji_104:1442298298378617043> Script **{name}** eliminado correctamente.", ephemeral=True)
+    await actualizar_menu(guild_id)
+
+@tree.command(name="help", description="Muestra los comandos disponibles y cómo usar el bot")
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="# <:emoji_109:1443424810553311232> Help Menu:",
+        description=(
+            "<a:emoji_68:1420097757959426188> /menu - Muestra el menú de scripts.\n"
+            "<a:emoji_68:1420097757959426188> /addscripts - Agrega un script (solo admins).\n"
+            "<a:emoji_68:1420097757959426188> /actuscripts - Actualiza un script existente (solo admins).\n"
+            "<a:emoji_68:1420097757959426188> /deletescripts - Elimina un script (solo admins).\n"
+            "<a:emoji_68:1420097757959426188> /desofuscar - Desofusca un archivo de script."
+        ),
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text="<a:emoji_107:1442318076787032186> Fast Bot")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@tree.command(name="desofuscar", description="Desofusca un archivo de script")
+@app_commands.describe(archivo="Archivo a desofuscar")
+async def desofuscar(interaction: discord.Interaction, archivo: discord.Attachment):
+    await interaction.response.send_message("<a:emoji_51:1419806050210807808> Desofuscando...", ephemeral=True)
+    try:
+        contenido = await archivo.read()
+        # Aquí puedes agregar lógica de desofuscación
+    except Exception as e:
+        await interaction.followup.send(f"<a:emoji_105:1442298312408567930> Error al leer el archivo: {e}", ephemeral=True)
+        return
+    await interaction.followup.send(
+        "<a:emoji_105:1442298312408567930> Créditos insuficientes\nCréditos actuales: ``0 Credits``",
+        ephemeral=True
+    )
 
 # ======================
 # EVENTOS BOT
